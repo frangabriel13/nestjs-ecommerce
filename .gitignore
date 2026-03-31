@@ -36,3 +36,6 @@ lerna-debug.log*
 
 #database data
 database-data
+
+# Environment files with secrets
+src/common/envs/*.env
