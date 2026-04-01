@@ -148,3 +148,106 @@ providers: [RoleService],
 
 **Justificación:**
 Si un servicio pertenece a otro módulo, debe llegarse a él únicamente a través de `imports`. Declararlo también en `providers` rompe el encapsulamiento del módulo propietario.
+
+---
+
+## Identificación de eventos de dominio
+
+Un evento de dominio representa algo que ocurrió en el sistema y que otras partes pueden necesitar saber, sin que el emisor tenga que conocerlas. En lugar de que un servicio llame directamente a otro, emite un evento y cualquier interesado reacciona de forma independiente.
+
+Se identificaron 7 puntos naturales en el dominio actual:
+
+---
+
+### `UserRegistered`
+**Dónde:** `AuthService.register()`, una vez que el usuario fue persistido exitosamente.
+
+Cuando alguien se registra, hay acciones que deberían ocurrir después pero que no son responsabilidad del servicio de autenticación: enviar un email de bienvenida, registrar el alta en un log de auditoría, notificar a un sistema de analytics. Si se quisiera agregar cualquiera de esas cosas hoy, habría que inyectar más servicios en `AuthService`, acoplándolo a preocupaciones que no le pertenecen. Emitir un evento resuelve eso.
+
+---
+
+### `UserLoggedIn`
+**Dónde:** `AuthService.login()`, una vez que las credenciales fueron validadas y el token generado.
+
+Cada login exitoso es un hecho relevante para seguridad y analytics. Un consumidor podría registrar la IP, la hora y el dispositivo para detectar accesos inusuales, o simplemente mantener un historial de actividad del usuario. Hoy ese dato se pierde sin dejar rastro.
+
+---
+
+### `RoleAssigned`
+**Dónde:** `RoleService.assignRoleToUser()`, una vez que el nuevo rol fue persistido.
+
+Cambiar el rol de un usuario es una acción de alto impacto en seguridad: un Customer puede pasar a ser Merchant o Admin. Ese cambio debería quedar registrado en un log de auditoría con quién lo hizo y cuándo. Es también el momento natural para invalidar cualquier caché de permisos si existiera. Hoy ocurre sin ningún tipo de trazabilidad.
+
+---
+
+### `ProductCreated`
+**Dónde:** `ProductService.createProduct()`, una vez que el producto fue persistido.
+
+La creación de un producto es el inicio de su ciclo de vida. Es el momento para notificar al merchant que su producto fue dado de alta en el sistema, o para iniciar un pipeline de validación en segundo plano. Hoy el servicio guarda el registro y retorna, sin modelar nada de lo que debería pasar a continuación.
+
+---
+
+### `ProductDetailsAdded`
+**Dónde:** `ProductService.addProductDetails()`, una vez que los datos fueron actualizados.
+
+Cuando se completan los detalles de un producto (título, código, variaciones, descripción), el producto pasa de ser un esqueleto vacío a tener contenido real. Es un paso intermedio del ciclo de vida que podría disparar una validación automática o una indexación parcial en un motor de búsqueda.
+
+---
+
+### `ProductActivated`
+**Dónde:** `ProductService.activateProduct()`, una vez que `isActive` fue seteado en `true`.
+
+Es el evento de mayor impacto de negocio en el dominio producto: el producto pasa de borrador a visible para los clientes. Es el momento natural para notificar al merchant que su producto está publicado, para indexarlo en un catálogo de búsqueda, o para disparar cualquier pipeline de publicación. Hoy el servicio hace un `UPDATE` y retorna — todo lo que debería pasar después queda sin modelar.
+
+---
+
+### `ProductDeleted`
+**Dónde:** `ProductService.deleteProduct()`, una vez que el registro fue eliminado.
+
+Cuando un producto se elimina, puede haber referencias asociadas que deberían limpiarse: entradas en índices de búsqueda, registros de inventario, precios por país. Hoy el servicio ejecuta un `DELETE` directo sin ningún side-effect. Un consumidor del evento podría encargarse de esa limpieza de forma desacoplada.
+
+---
+
+## Implementación de eventos de dominio
+
+Se implementaron 2 eventos de dominio usando `@nestjs/event-emitter@1.4.2` (versión compatible con NestJS 9).
+
+El módulo se registró globalmente en `src/api/api.module.ts` con `EventEmitterModule.forRoot()`, lo que permite inyectar `EventEmitter2` en cualquier servicio sin configuración adicional por módulo.
+
+---
+
+### Evento 1: `UserRegistered`
+
+**Archivos involucrados:**
+- `src/events/user-registered.event.ts` — clase del evento con `userId` y `email`
+- `src/api/auth/services/auth.service.ts` — emisor
+- `src/api/auth/listeners/user-registered.listener.ts` — consumidor
+
+**Flujo:**
+`AuthService.register()` crea el usuario y emite `'user.registered'` con su `id` y `email`. El listener reacciona de forma completamente desacoplada — `AuthService` no sabe que existe.
+
+**Por qué este evento:** si en el futuro se quisiera enviar un email de bienvenida o registrar el alta en un log de auditoría, solo se agrega un nuevo listener. `AuthService` no se toca.
+
+**Verificación:**
+```
+[UserRegisteredListener] New user registered - id: 3, email: test12345@test.com
+```
+
+---
+
+### Evento 2: `ProductActivated`
+
+**Archivos involucrados:**
+- `src/events/product-activated.event.ts` — clase del evento con `productId` y `merchantId`
+- `src/api/product/services/product.service.ts` — emisor
+- `src/api/product/listeners/product-activated.listener.ts` — consumidor
+
+**Flujo:**
+`ProductService.activateProduct()` ejecuta el `UPDATE` y luego emite `'product.activated'` con el `productId` y `merchantId`. El listener reacciona de forma independiente.
+
+**Por qué este evento:** es el cambio de estado más significativo del ciclo de vida de un producto. Notificar al merchant, indexar en un catálogo o disparar un pipeline de publicación son responsabilidades que no le pertenecen a `ProductService`. Con el evento, cada una puede implementarse como un listener independiente.
+
+**Verificación:**
+```
+[ProductActivatedListener] Product activated - productId: 3, merchantId: 2
+```
