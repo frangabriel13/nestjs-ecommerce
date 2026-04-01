@@ -1,5 +1,12 @@
 # Ecommerce App — NestJS + React
 
+## Deploy
+
+| Servicio | URL |
+|---|---|
+| Backend | https://nestjs-ecommerce-kdkr.onrender.com |
+| Frontend | https://nestjs-ecommerce-two.vercel.app |
+
 ## Stack
 
 - **Backend:** NestJS 9, TypeORM, PostgreSQL, JWT
