@@ -368,3 +368,38 @@ npm test
 # E2E tests (requiere base de datos de test activa)
 npm run test:e2e
 ```
+
+---
+
+## Problema 5: Glob de entidades no funciona con TypeORM 0.3.x
+
+**Archivo:** `src/database/typeorm/typeOrm.config.ts`
+
+**Descripción:**
+La configuración original usaba `entities: [process.env.DATABASE_ENTITIES]` donde `DATABASE_ENTITIES=dist/**/*.entity.{ts,js}`. Esto funcionaba en desarrollo local porque el glob se resolvía correctamente en ese entorno. Sin embargo, al deployar en producción y correr migraciones y seeds, el glob no resolvía las entidades y TypeORM inicializaba la conexión sin metadata de entidades registrada.
+
+El error resultante era:
+```
+EntityMetadataNotFoundError: No metadata for "Role" was found.
+```
+
+**Causa raíz:**
+En TypeORM 0.3.x, `TypeOrmModule.forFeature()` de NestJS **no agrega** entidades al DataSource — solo crea repositorios para entidades que **ya están registradas** en el DataSource vía la opción `entities` del `forRoot`. Si el glob falla (por expansión de llaves en bash, path incorrecto, o entorno de ejecución), el DataSource queda sin entidades y todos los repositorios fallan.
+
+**Corrección aplicada:**
+Se reemplazó el glob por importaciones explícitas de las clases de entidad:
+
+```typescript
+// Antes
+entities: [process.env.DATABASE_ENTITIES],
+
+// Después
+import { Role } from '../entities/role.entity';
+import { User } from '../entities/user.entity';
+// ... resto de entidades
+
+entities: [Category, Color, Country, Currency, Inventory, Product, ProductVariation, ProductVariationPrice, Role, Size, User],
+```
+
+**Justificación:**
+Las importaciones explícitas son más robustas que los globs: no dependen del entorno de ejecución, el compilador TypeScript valida que las clases existan, y el comportamiento es predecible en desarrollo, test y producción.
