@@ -18,20 +18,20 @@ export function AssignRole() {
     setMessage('')
     try {
       await assignRole(Number(userId), Number(roleId))
-      setMessage(`Role assigned successfully`)
+      setMessage('Rol asignado exitosamente')
     } catch (err: any) {
-      setMessage(err.response?.data?.message || 'Error assigning role')
+      setMessage(err.response?.data?.message || 'Error al asignar rol')
     }
   }
 
   return (
     <div>
-      <h3>Assign Role <small>(Admin only)</small></h3>
+      <h3>Asignar rol <small>(solo Admin)</small></h3>
       <form onSubmit={handleSubmit}>
         <div>
           <input
             type="number"
-            placeholder="User ID"
+            placeholder="ID de usuario"
             value={userId}
             onChange={(e) => setUserId(e.target.value)}
           />

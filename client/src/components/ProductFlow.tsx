@@ -41,31 +41,31 @@ export function ProductFlow() {
       const res = await createProduct(1) // categoryId 1 = Computers
       const product = res.data.data
       setProductId(product.id)
-      show(product, `Product created with id: ${product.id}`)
+      show(product, `Producto creado con id: ${product.id}`)
     } catch (err: any) {
-      setMessage(err.response?.data?.message || 'Error creating product')
+      setMessage(err.response?.data?.message || 'Error al crear producto')
     }
   }
 
   const handleAddDetails = async () => {
-    if (!productId) return setMessage('Create a product first')
+    if (!productId) return setMessage('Primero creá un producto')
     setMessage('')
     try {
       const res = await addProductDetails(productId, DEFAULT_DETAILS)
-      show(res.data.data, 'Details added')
+      show(res.data.data, 'Detalles agregados')
     } catch (err: any) {
-      setMessage(err.response?.data?.message || 'Error adding details')
+      setMessage(err.response?.data?.message || 'Error al agregar detalles')
     }
   }
 
   const handleActivate = async () => {
-    if (!productId) return setMessage('Create a product first')
+    if (!productId) return setMessage('Primero creá un producto')
     setMessage('')
     try {
       const res = await activateProduct(productId)
-      show(res.data.data, `Product ${productId} activated — check the event log!`)
+      show(res.data.data, `Producto ${productId} activado — ¡revisá el panel de eventos!`)
     } catch (err: any) {
-      setMessage(err.response?.data?.message || 'Error activating product')
+      setMessage(err.response?.data?.message || 'Error al activar producto')
     }
   }
 
@@ -75,7 +75,7 @@ export function ProductFlow() {
       const res = await getProduct(Number(getProductId))
       show(res.data.data)
     } catch (err: any) {
-      setMessage(err.response?.data?.message || 'Product not found')
+      setMessage(err.response?.data?.message || 'Producto no encontrado')
     }
   }
 
@@ -83,15 +83,15 @@ export function ProductFlow() {
     setMessage('')
     try {
       const res = await deleteProduct(Number(deleteProductId))
-      show(res.data.data, `Product ${deleteProductId} deleted`)
+      show(res.data.data, `Producto ${deleteProductId} eliminado`)
     } catch (err: any) {
-      setMessage(err.response?.data?.message || 'Error deleting product')
+      setMessage(err.response?.data?.message || 'Error al eliminar producto')
     }
   }
 
   return (
     <div>
-      <h3>Product Flow <small>(Admin / Merchant)</small></h3>
+      <h3>Flujo de producto <small>(Admin / Merchant)</small></h3>
 
       <div style={{ marginBottom: '0.5rem' }}>
         <button onClick={handleCreate}>POST /product/create</button>

@@ -18,13 +18,13 @@ export function LoginForm({ onLogin }: Props) {
       const token = res.data.data.accessToken
       onLogin(token)
     } catch (err: any) {
-      setMessage(err.response?.data?.message || 'Invalid credentials')
+      setMessage(err.response?.data?.message || 'Credenciales inválidas')
     }
   }
 
   return (
     <div>
-      <h3>Login</h3>
+      <h3>Iniciar sesión</h3>
       <form onSubmit={handleSubmit}>
         <div>
           <input
@@ -37,12 +37,12 @@ export function LoginForm({ onLogin }: Props) {
         <div>
           <input
             type="password"
-            placeholder="Password"
+            placeholder="Contraseña"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
           />
         </div>
-        <button type="submit">Login</button>
+        <button type="submit">Ingresar</button>
       </form>
       {message && <p>{message}</p>}
     </div>

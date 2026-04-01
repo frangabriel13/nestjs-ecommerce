@@ -11,13 +11,13 @@ export function UserProfile() {
       const res = await getProfile()
       setProfile(res.data.data)
     } catch (err: any) {
-      setMessage(err.response?.data?.message || 'Error fetching profile')
+      setMessage(err.response?.data?.message || 'Error al obtener el perfil')
     }
   }
 
   return (
     <div>
-      <h3>User Profile</h3>
+      <h3>Perfil de usuario</h3>
       <button onClick={handleFetch}>GET /user/profile</button>
       {profile && (
         <pre>{JSON.stringify(profile, null, 2)}</pre>

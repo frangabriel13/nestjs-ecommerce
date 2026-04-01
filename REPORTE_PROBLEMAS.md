@@ -251,3 +251,120 @@ El módulo se registró globalmente en `src/api/api.module.ts` con `EventEmitter
 ```
 [ProductActivatedListener] Product activated - productId: 3, merchantId: 2
 ```
+
+---
+
+## Decisiones técnicas relevantes
+
+### `@nestjs/event-emitter@1.4.2` — versión fijada por compatibilidad
+
+La versión más reciente de `@nestjs/event-emitter` requiere NestJS 10 o superior. Este proyecto usa NestJS 9, por lo que instalar la versión latest genera un conflicto de peer dependencies. Se fijó la versión `1.4.2`, que es la última compatible con NestJS 9.
+
+### SSE en lugar de WebSockets para el canal de eventos al frontend
+
+Para exponer los eventos de dominio al frontend se eligió **Server-Sent Events (SSE)** en lugar de WebSockets por las siguientes razones:
+
+- El flujo de información es unidireccional: el servidor empuja eventos al cliente, no al revés. SSE es el protocolo diseñado exactamente para este caso.
+- SSE funciona sobre HTTP estándar, no requiere upgrade de protocolo ni librerías adicionales en el cliente (`EventSource` está disponible nativamente en el browser).
+- NestJS tiene soporte nativo con el decorador `@Sse()`, lo que mantiene la implementación dentro del mismo estilo del resto del proyecto.
+- WebSockets agregarían complejidad innecesaria (`@nestjs/websockets`, `socket.io`) para un canal que no requiere comunicación bidireccional.
+
+### `onAny` en el controlador SSE
+
+El `EventsController` usa `this.eventEmitter.onAny(handler)` en lugar de suscribirse a eventos individuales. Esto permite que cualquier evento de dominio futuro sea automáticamente expuesto al frontend sin modificar el controlador. Es una decisión de extensibilidad: agregar un nuevo evento al sistema no requiere ningún cambio en la capa de transporte.
+
+### Separación entre clase de evento, emisor y listener
+
+Cada evento sigue la misma estructura de tres archivos:
+- **Clase del evento** (`src/events/`) — define el contrato de datos, sin lógica.
+- **Emisor** — el servicio de dominio que emite el evento después de completar su operación principal.
+- **Listener** — el consumidor desacoplado que reacciona al evento.
+
+Esta separación garantiza que el emisor no conoce a sus consumidores. Agregar un nuevo comportamiento ante un evento (por ejemplo, enviar un email cuando se activa un producto) solo requiere agregar un nuevo listener, sin tocar el servicio que emite.
+
+### Frontend desacoplado en `client/`
+
+La app React vive en su propio directorio con su propio `package.json`, completamente separada del proyecto NestJS. Se excluyó del compilador de TypeScript del backend (`tsconfig.build.json`) para evitar conflictos de configuración entre los dos entornos de compilación.
+
+---
+
+## Cómo levantar el proyecto
+
+### Requisitos previos
+
+- Node.js 18+
+- Docker y Docker Compose
+
+### 1. Clonar e instalar dependencias
+
+```bash
+git clone <repo>
+cd nestjs-ecommerce
+npm install
+cd client && npm install && cd ..
+```
+
+### 2. Configurar variables de entorno
+
+Crear el archivo `src/common/envs/development.env` (no está en el repositorio por seguridad). Usar como referencia:
+
+```env
+PORT=3000
+BASE_URL=http://localhost:3000
+
+DATABASE_HOST=localhost
+DATABASE_PORT=5432
+DATABASE_NAME=ecommercedb
+DATABASE_USER=hassan
+DATABASE_PASSWORD=password
+DATABASE_ENTITIES=dist/**/*.entity.{ts,js}
+
+JWT_SECRET=keep-this-secret-private
+
+ADMIN_EMAIL=admin@admin.com
+ADMIN_PASSWORD=12345678
+```
+
+### 3. Levantar la base de datos
+
+```bash
+docker-compose up -d
+```
+
+Esto crea dos bases de datos: `ecommercedb` (desarrollo) y `ecommercetestdb` (tests).
+
+### 4. Correr migraciones y seeds
+
+```bash
+npm run migration:run
+npm run seed:run
+```
+
+El seed crea los roles, categorías y un usuario administrador con las credenciales definidas en `ADMIN_EMAIL` y `ADMIN_PASSWORD`.
+
+### 5. Levantar el backend
+
+```bash
+npm run start:dev
+```
+
+El backend queda disponible en `http://localhost:3000`.
+
+### 6. Levantar el frontend
+
+```bash
+cd client
+npm run dev
+```
+
+El frontend queda disponible en `http://localhost:5173`.
+
+### 7. Correr los tests
+
+```bash
+# Unit tests
+npm test
+
+# E2E tests (requiere base de datos de test activa)
+npm run test:e2e
+```
