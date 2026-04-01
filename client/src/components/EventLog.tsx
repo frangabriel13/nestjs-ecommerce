@@ -11,7 +11,8 @@ export function EventLog() {
   const [connected, setConnected] = useState(false)
 
   useEffect(() => {
-    const es = new EventSource('http://localhost:3000/events')
+    const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000'
+    const es = new EventSource(`${apiUrl}/events`)
 
     es.onopen = () => setConnected(true)
 
