@@ -5,18 +5,21 @@ import {
 } from '@nestjs/common';
 import { DeleteResult, EntityManager } from 'typeorm';
 import { InjectEntityManager } from '@nestjs/typeorm';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { CreateProductDto, ProductDetailsDto } from '../dto/product.dto';
 import { Category } from '../../../database/entities/category.entity';
 import { Product } from 'src/database/entities/product.entity';
 import { errorMessages } from 'src/errors/custom';
 import { validate } from 'class-validator';
 import { successObject } from 'src/common/helper/sucess-response.interceptor';
+import { ProductActivatedEvent } from 'src/events/product-activated.event';
 
 @Injectable()
 export class ProductService {
   constructor(
     @InjectEntityManager()
     private readonly entityManager: EntityManager,
+    private eventEmitter: EventEmitter2,
   ) {}
 
   async getProduct(productId: number) {
@@ -82,6 +85,11 @@ export class ProductService {
       .andWhere('merchantId = :merchantId', { merchantId })
       .returning(['id', 'isActive'])
       .execute();
+
+    this.eventEmitter.emit(
+      'product.activated',
+      new ProductActivatedEvent(productId, merchantId),
+    );
 
     return result.raw[0];
   }
