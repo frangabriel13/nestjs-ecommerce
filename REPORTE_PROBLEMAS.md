@@ -82,7 +82,9 @@ Agregar un script `test:setup` en `package.json` que ejecute build, migrations y
 
 ---
 
-## Diagnóstico final: Estado de la aplicación
+---
+
+## Diagnóstico inicial: Estado de la aplicación
 
 Luego de identificar y documentar los problemas del repositorio, se verificó el funcionamiento de la aplicación ejecutando todos los endpoints disponibles y corriendo la suite de tests completa.
 
@@ -113,3 +115,36 @@ Los más relevantes para atender en una siguiente iteración son:
 | Credenciales hardcodeadas como fallback en config | `config/index.ts` | Seguridad |
 | Tipos incorrectos en relaciones OneToMany | `user.entity.ts`, `category.entity.ts` | Bug tipado |
 | `ValidationPipe` sin `whitelist: true` | `main.ts` | Seguridad |
+
+---
+
+## Problema 4: `UserService` re-declarado como provider en módulos que ya lo importan
+
+**Archivos:** `src/api/auth/auth.module.ts`, `src/api/role/role.module.ts`
+
+**Descripción:**
+`UserService` aparecía listado en el array `providers` de `AuthModule` y `RoleModule`, a pesar de que ambos módulos ya importan `UserModule`, el cual exporta `UserService`. Esto hace que NestJS instancie una segunda copia local del servicio en cada módulo, ignorando la instancia provista por `UserModule`.
+
+**Impacto:**
+Si `UserService` llegara a mantener algún estado interno o caché, las dos instancias tendrían estados independientes. Además, es un diseño incorrecto que puede generar confusión y comportamientos inesperados al escalar el proyecto.
+
+**Corrección aplicada:**
+
+```typescript
+// auth.module.ts — Antes
+providers: [AuthService, UserService],
+
+// auth.module.ts — Después
+providers: [AuthService],
+```
+
+```typescript
+// role.module.ts — Antes
+providers: [RoleService, UserService],
+
+// role.module.ts — Después
+providers: [RoleService],
+```
+
+**Justificación:**
+Si un servicio pertenece a otro módulo, debe llegarse a él únicamente a través de `imports`. Declararlo también en `providers` rompe el encapsulamiento del módulo propietario.
