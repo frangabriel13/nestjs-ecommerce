@@ -7,6 +7,8 @@ const envFilePath: string = getEnvPath(
   resolve(__dirname, '../..', 'common/envs'),
 );
 config({ path: envFilePath });
+const isProduction = process.env.NODE_ENV === 'production';
+
 export const dataSourceOptions: DataSourceOptions = {
   type: 'postgres',
   host: process.env.DATABASE_HOST,
@@ -17,6 +19,7 @@ export const dataSourceOptions: DataSourceOptions = {
   entities: [process.env.DATABASE_ENTITIES],
   migrations: ['dist/database/migration/history/*.js'],
   logger: 'simple-console',
-  synchronize: false, // never use TRUE in production!
-  logging: true, // for debugging in dev Area only
+  synchronize: false,
+  logging: !isProduction,
+  ssl: isProduction ? { rejectUnauthorized: false } : false,
 };
