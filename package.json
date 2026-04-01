@@ -19,6 +19,7 @@
     "test:cov": "jest --coverage",
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
     "test:e2e": "jest --config ./test/jest-e2e.json --forceExit --detectOpenHandles --verbose",
+    "test:setup": "npm run build && DATABASE_NAME=ecommercetestdb npx typeorm -d dist/database/migration/datasource.js migration:run && DATABASE_NAME=ecommercetestdb node dist/database/seed/seed.js",
     "seed:run": "nest start --entryFile ./database/seed/seed.js",
     "typeorm": "npm run clean && npm run build && npx typeorm -d dist/database/migration/datasource.js",
     "migration:generate": "npm run typeorm -- migration:generate src/database/migration/history/$npm_config_name",
