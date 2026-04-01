@@ -5,10 +5,7 @@
 **Archivo:** `docker-compose.yml`
 
 **Descripción:**
-La imagen de PostgreSQL estaba definida como `image: postgres` sin especificar versión. Esto hace que Docker descargue siempre la última versión disponible (`latest`), lo cual rompe el contenedor cuando hay un major upgrade (en este caso, postgres 18 cambió la estructura del directorio de datos).
-
-**Impacto:**
-El contenedor no levanta y la aplicación no puede conectarse a la base de datos. El error es difícil de diagnosticar para alguien que no conoce el historial del issue.
+La imagen de PostgreSQL estaba definida como `image: postgres` sin especificar versión. Esto hace que Docker descargue siempre la última versión disponible, lo cual rompe el contenedor (en este caso, postgres 18 cambió la estructura del directorio de datos). El contenedor no levanta y la aplicación no puede conectarse a la base de datos. El error es difícil de diagnosticar para alguien que no conoce el historial del issue.
 
 **Corrección aplicada:**
 ```yaml
@@ -20,7 +17,7 @@ image: postgres:16
 ```
 
 **Justificación:**
-Siempre se debe fijar la versión de las imágenes en entornos de desarrollo y producción para garantizar reproducibilidad y evitar roturas por upgrades automáticos.
+Siempre se debe fijar la versión de las imágenes en entornos de desarrollo y producción.
 
 ---
 
@@ -29,10 +26,7 @@ Siempre se debe fijar la versión de las imágenes en entornos de desarrollo y p
 **Archivo:** `.gitignore`, `src/common/envs/development.env`
 
 **Descripción:**
-Los archivos `.env` contienen credenciales reales (contraseña de base de datos, JWT secret, email y contraseña del administrador) y no estaban excluidos del repositorio. El `.gitignore` no incluía la carpeta `src/common/envs/`.
-
-**Impacto:**
-Cualquier persona con acceso al repositorio tiene acceso a las credenciales. El JWT secret expuesto permite forjar tokens válidos sin conocer la contraseña de ningún usuario.
+Los archivos `.env` contienen credenciales reales (contraseña de base de datos, JWT secret, email y contraseña del administrador) y no estaban excluidos del repositorio. El `.gitignore` no incluía la carpeta `src/common/envs/`. Cualquier persona con acceso al repositorio tiene acceso a las credenciales.
 
 **Corrección aplicada:**
 ```gitignore
@@ -43,7 +37,7 @@ src/common/envs/*.env
 ```
 
 **Justificación:**
-Los archivos de entorno con credenciales nunca deben commitearse. La práctica estándar es proveer un archivo `*.env.example` con valores de ejemplo y que cada desarrollador genere su propio `.env` local.
+Los archivos de entorno con credenciales nunca deben commitearse.
 
 ---
 
@@ -52,35 +46,82 @@ Los archivos de entorno con credenciales nunca deben commitearse. La práctica e
 **Archivos:** `src/common/envs/test.env`, `package.json`
 
 **Descripción:**
-`test.env` define `DATABASE_ENTITIES=src/**/*.entity.{ts,js}`, apuntando a los archivos TypeScript fuente. Esto funciona en los e2e tests porque Jest usa ts-jest, que compila TypeScript on the fly. Sin embargo, los comandos `migration:run` y `seed:run` corren sobre Node.js puro, que en versiones modernas solo puede "strip" tipos de TypeScript pero no puede transformar `enum`, que es una construcción que requiere compilación real.
+`test.env` define `DATABASE_ENTITIES=src/**/*.entity.{ts,js}`, apuntando a los archivos TypeScript fuente. Esto funciona en los e2e tests porque Jest usa ts-jest, que compila TypeScript on the fly. Sin embargo, los comandos `migration:run` y `seed:run` corren sobre Node.js puro, que no compila TypeScript, solo ignora las anotaciones de tipo. Cuando encuentra un enum, que requiere ser transformado a JavaScript real, falla con un error de sintaxis.
 
-El resultado es que cualquier desarrollador que intente preparar la base de datos de test con los comandos documentados recibe:
+No hay ningún workaround documentado ni un script que prepare el entorno de test de punta a punta. La preparación del entorno de test está rota para cualquier desarrollador que clone el repo.
 
-```
-SyntaxError: TypeScript enum is not supported in strip-only mode
-```
-
-No hay ningún workaround documentado ni un script que prepare el entorno de test de punta a punta. El repo no puede usarse desde cero sin conocer este problema internamente.
-
-**Impacto:**
-Los e2e tests no pueden correrse en una máquina nueva sin pasos no documentados. La preparación del entorno de test está rota para cualquier desarrollador que clone el repo.
-
-**Workaround aplicado:**
-Correr migrations y seeds sin `NODE_ENV=test`, sobreescribiendo solo `DATABASE_NAME`:
+**Corrección aplicada:**
+Se agregó el script `test:setup` en `package.json` que compila, corre migraciones y seeds contra la base de test en un solo comando:
 
 ```bash
-# Migrations
-npm run build
-DATABASE_NAME=ecommercetestdb npx typeorm -d dist/database/migration/datasource.js migration:run
-
-# Seeds
-DATABASE_NAME=ecommercetestdb npm run seed:run
+npm run test:setup
 ```
 
-**Corrección definitiva sugerida:**
-Agregar un script `test:setup` en `package.json` que ejecute build, migrations y seeds contra la base de test, y documentarlo como paso previo a `npm run test:e2e`.
+Esto debe ejecutarse una vez antes de correr `npm run test:e2e` en una máquina nueva.
 
 ---
+
+## Problema 4: `UserService` re-declarado como provider en módulos que ya lo importan
+
+**Archivos:** `src/api/auth/auth.module.ts`, `src/api/role/role.module.ts`
+
+**Descripción:**
+`UserService` aparecía listado en el array `providers` de `AuthModule` y `RoleModule`, a pesar de que ambos módulos ya importan `UserModule`, el cual exporta `UserService`. Esto hace que NestJS instancie una segunda copia local del servicio en cada módulo, ignorando la instancia provista por `UserModule`.
+
+**Impacto:**
+Si `UserService` llegara a mantener algún estado interno o caché, las dos instancias tendrían estados independientes. Además, es un diseño incorrecto que puede generar confusión y comportamientos inesperados al escalar el proyecto.
+
+**Corrección aplicada:**
+
+```typescript
+// auth.module.ts — Antes
+providers: [AuthService, UserService],
+
+// auth.module.ts — Después
+providers: [AuthService],
+```
+
+```typescript
+// role.module.ts — Antes
+providers: [RoleService, UserService],
+
+// role.module.ts — Después
+providers: [RoleService],
+```
+
+**Justificación:**
+Si un servicio pertenece a otro módulo, debe llegarse a él únicamente a través de `imports`. Declararlo también en `providers` rompe el encapsulamiento del módulo propietario.
+
+---
+
+## Problema 5: Glob de entidades no funciona con TypeORM 0.3.x
+
+**Archivo:** `src/database/typeorm/typeOrm.config.ts`
+
+**Descripción:**
+La configuración original usaba `entities: [process.env.DATABASE_ENTITIES]` donde `DATABASE_ENTITIES=dist/**/*.entity.{ts,js}`. Esto funcionaba en desarrollo local porque el glob se resolvía correctamente en ese entorno. Sin embargo, al deployar en producción y correr migraciones y seeds, el glob no resolvía las entidades y TypeORM inicializaba la conexión sin metadata de entidades registrada.
+
+El error resultante era:
+```
+EntityMetadataNotFoundError: No metadata for "Role" was found.
+```
+
+**Causa raíz:**
+En TypeORM 0.3.x, `TypeOrmModule.forFeature()` de NestJS **no agrega** entidades al DataSource — solo crea repositorios para entidades que **ya están registradas** en el DataSource vía la opción `entities` del `forRoot`. Si el glob falla (por expansión de llaves en bash, path incorrecto, o entorno de ejecución), el DataSource queda sin entidades y todos los repositorios fallan.
+
+**Corrección aplicada:**
+Se reemplazó el glob por importaciones explícitas de las clases de entidad:
+
+```typescript
+// Antes
+entities: [process.env.DATABASE_ENTITIES],
+
+// Después
+entities: [Category, Color, Country, Currency, Inventory, Product, ProductVariation, ProductVariationPrice, Role, Size, User],
+```
+
+**Justificación:**
+Las importaciones explícitas son más robustas que los globs: no dependen del entorno de ejecución, el compilador TypeScript valida que las clases existan, y el comportamiento es predecible en desarrollo, test y producción.
 
 ---
 
@@ -115,39 +156,6 @@ Los más relevantes para atender en una siguiente iteración son:
 | Credenciales hardcodeadas como fallback en config | `config/index.ts` | Seguridad |
 | Tipos incorrectos en relaciones OneToMany | `user.entity.ts`, `category.entity.ts` | Bug tipado |
 | `ValidationPipe` sin `whitelist: true` | `main.ts` | Seguridad |
-
----
-
-## Problema 4: `UserService` re-declarado como provider en módulos que ya lo importan
-
-**Archivos:** `src/api/auth/auth.module.ts`, `src/api/role/role.module.ts`
-
-**Descripción:**
-`UserService` aparecía listado en el array `providers` de `AuthModule` y `RoleModule`, a pesar de que ambos módulos ya importan `UserModule`, el cual exporta `UserService`. Esto hace que NestJS instancie una segunda copia local del servicio en cada módulo, ignorando la instancia provista por `UserModule`.
-
-**Impacto:**
-Si `UserService` llegara a mantener algún estado interno o caché, las dos instancias tendrían estados independientes. Además, es un diseño incorrecto que puede generar confusión y comportamientos inesperados al escalar el proyecto.
-
-**Corrección aplicada:**
-
-```typescript
-// auth.module.ts — Antes
-providers: [AuthService, UserService],
-
-// auth.module.ts — Después
-providers: [AuthService],
-```
-
-```typescript
-// role.module.ts — Antes
-providers: [RoleService, UserService],
-
-// role.module.ts — Después
-providers: [RoleService],
-```
-
-**Justificación:**
-Si un servicio pertenece a otro módulo, debe llegarse a él únicamente a través de `imports`. Declararlo también en `providers` rompe el encapsulamiento del módulo propietario.
 
 ---
 
@@ -285,121 +293,3 @@ Esta separación garantiza que el emisor no conoce a sus consumidores. Agregar u
 ### Frontend desacoplado en `client/`
 
 La app React vive en su propio directorio con su propio `package.json`, completamente separada del proyecto NestJS. Se excluyó del compilador de TypeScript del backend (`tsconfig.build.json`) para evitar conflictos de configuración entre los dos entornos de compilación.
-
----
-
-## Cómo levantar el proyecto
-
-### Requisitos previos
-
-- Node.js 18+
-- Docker y Docker Compose
-
-### 1. Clonar e instalar dependencias
-
-```bash
-git clone <repo>
-cd nestjs-ecommerce
-npm install
-cd client && npm install && cd ..
-```
-
-### 2. Configurar variables de entorno
-
-Crear el archivo `src/common/envs/development.env` (no está en el repositorio por seguridad). Usar como referencia:
-
-```env
-PORT=3000
-BASE_URL=http://localhost:3000
-
-DATABASE_HOST=localhost
-DATABASE_PORT=5432
-DATABASE_NAME=ecommercedb
-DATABASE_USER=hassan
-DATABASE_PASSWORD=password
-DATABASE_ENTITIES=dist/**/*.entity.{ts,js}
-
-JWT_SECRET=keep-this-secret-private
-
-ADMIN_EMAIL=admin@admin.com
-ADMIN_PASSWORD=12345678
-```
-
-### 3. Levantar la base de datos
-
-```bash
-docker-compose up -d
-```
-
-Esto crea dos bases de datos: `ecommercedb` (desarrollo) y `ecommercetestdb` (tests).
-
-### 4. Correr migraciones y seeds
-
-```bash
-npm run migration:run
-npm run seed:run
-```
-
-El seed crea los roles, categorías y un usuario administrador con las credenciales definidas en `ADMIN_EMAIL` y `ADMIN_PASSWORD`.
-
-### 5. Levantar el backend
-
-```bash
-npm run start:dev
-```
-
-El backend queda disponible en `http://localhost:3000`.
-
-### 6. Levantar el frontend
-
-```bash
-cd client
-npm run dev
-```
-
-El frontend queda disponible en `http://localhost:5173`.
-
-### 7. Correr los tests
-
-```bash
-# Unit tests
-npm test
-
-# E2E tests (requiere base de datos de test activa)
-npm run test:e2e
-```
-
----
-
-## Problema 5: Glob de entidades no funciona con TypeORM 0.3.x
-
-**Archivo:** `src/database/typeorm/typeOrm.config.ts`
-
-**Descripción:**
-La configuración original usaba `entities: [process.env.DATABASE_ENTITIES]` donde `DATABASE_ENTITIES=dist/**/*.entity.{ts,js}`. Esto funcionaba en desarrollo local porque el glob se resolvía correctamente en ese entorno. Sin embargo, al deployar en producción y correr migraciones y seeds, el glob no resolvía las entidades y TypeORM inicializaba la conexión sin metadata de entidades registrada.
-
-El error resultante era:
-```
-EntityMetadataNotFoundError: No metadata for "Role" was found.
-```
-
-**Causa raíz:**
-En TypeORM 0.3.x, `TypeOrmModule.forFeature()` de NestJS **no agrega** entidades al DataSource — solo crea repositorios para entidades que **ya están registradas** en el DataSource vía la opción `entities` del `forRoot`. Si el glob falla (por expansión de llaves en bash, path incorrecto, o entorno de ejecución), el DataSource queda sin entidades y todos los repositorios fallan.
-
-**Corrección aplicada:**
-Se reemplazó el glob por importaciones explícitas de las clases de entidad:
-
-```typescript
-// Antes
-entities: [process.env.DATABASE_ENTITIES],
-
-// Después
-import { Role } from '../entities/role.entity';
-import { User } from '../entities/user.entity';
-// ... resto de entidades
-
-entities: [Category, Color, Country, Currency, Inventory, Product, ProductVariation, ProductVariationPrice, Role, Size, User],
-```
-
-**Justificación:**
-Las importaciones explícitas son más robustas que los globs: no dependen del entorno de ejecución, el compilador TypeScript valida que las clases existan, y el comportamiento es predecible en desarrollo, test y producción.
