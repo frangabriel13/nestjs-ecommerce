@@ -1,67 +1,94 @@
-# Ecommerce App with Nest.js and Postgres
+# Ecommerce App — NestJS + React
 
-## Description
-This project is an ecommerce application built using Nest.js and Postgres. The focus is on writing clean, modular, and testable code, and following a well-organized project structure.
+## Stack
 
-## Technology Stack
+- **Backend:** NestJS 9, TypeORM, PostgreSQL, JWT
+- **Frontend:** React 19, Vite, Axios
+- **Eventos:** `@nestjs/event-emitter` + SSE (Server-Sent Events)
 
-- Nest.js
-- PostgreSQL
-- TypeORM
-- Jest
+## Requisitos previos
 
-## Getting Started
+- Node.js 18+
+- Docker y Docker Compose
 
-To get started with this project, follow these steps:
+## Cómo levantar el proyecto
 
-- Clone this repository to your local machine.
-- navigate to the nestjs-ecommerce directory.
+### 1. Clonar e instalar dependencias
 
-```bash 
-cd ./nestjs-ecommerce
+```bash
+git clone <repo>
+cd nestjs-ecommerce
+npm install
+cd client && npm install && cd ..
 ```
-- start postgres database.
+
+### 2. Configurar variables de entorno
+
+Crear el archivo `src/common/envs/development.env` (no está en el repositorio por seguridad). Usar como referencia:
+
+```env
+PORT=3000
+BASE_URL=http://localhost:3000
+
+DATABASE_HOST=localhost
+DATABASE_PORT=5432
+DATABASE_NAME=ecommercedb
+DATABASE_USER=hassan
+DATABASE_PASSWORD=password
+DATABASE_ENTITIES=dist/**/*.entity.{ts,js}
+
+JWT_SECRET=keep-this-secret-private
+
+ADMIN_EMAIL=admin@admin.com
+ADMIN_PASSWORD=12345678
+```
+
+### 3. Levantar la base de datos
 
 ```bash
 docker-compose up -d
 ```
 
-- install app dependencies.
+Esto crea dos bases de datos: `ecommercedb` (desarrollo) y `ecommercetestdb` (tests).
 
-```bash
-npm install
-```
-
-- run database migrations.
+### 4. Correr migraciones y seeds
 
 ```bash
 npm run migration:run
-```
-if you want to generate any future migration
-
-```bash
-npm run migration:generate --name=<migrationName>
-```
-
-- run database seeders.
-
-```bash
 npm run seed:run
 ```
 
-- start the applictaion.
+El seed crea los roles, categorías y un usuario administrador con las credenciales definidas en `ADMIN_EMAIL` y `ADMIN_PASSWORD`.
+
+### 5. Levantar el backend
 
 ```bash
 npm run start:dev
 ```
 
-## Testing
-To run the tests, follow these steps:
-1. Install dependencies: `npm install`
-2. Run the tests: `npm run test`
+El backend queda disponible en `http://localhost:3000`.
 
-## Contributing
-If you're interested in contributing to this project, please follow these guidelines:
-1. Fork the repository
-2. Make your changes
-3. Submit a pull request
+### 6. Levantar el frontend
+
+```bash
+cd client
+npm run dev
+```
+
+El frontend queda disponible en `http://localhost:5173`.
+
+## Tests
+
+```bash
+# Unit tests
+npm test
+
+# E2E tests (requiere base de datos de test activa)
+npm run test:e2e
+```
+
+## Generar migraciones
+
+```bash
+npm run migration:generate --name=<MigrationName>
+```
