@@ -235,6 +235,10 @@ El módulo se registró globalmente en `src/api/api.module.ts` con `EventEmitter
 
 ## Decisiones técnicas relevantes
 
+### Monolito event-driven en lugar de microservicios
+
+El desafío propone evolucionar el sistema hacia un modelo event-driven. Se eligió mantener el monolito y aplicar ese modelo internamente, en lugar de extraer microservicios, porque el alcance del dominio y el volumen de datos no justifican la complejidad operativa que implicaría. La arquitectura event-driven con `EventEmitter2` logra el desacoplamiento entre módulos con una fracción de esa complejidad. Si el sistema creciera en volumen o equipos, el mismo contrato de eventos puede migrar a un bus externo (Kafka, RabbitMQ) sin cambiar la lógica de los emisores.
+
 ### `@nestjs/event-emitter@1.4.2` — versión fijada por compatibilidad
 
 La versión más reciente de `@nestjs/event-emitter` requiere NestJS 10 o superior. Este proyecto usa NestJS 9, por lo que instalar la versión latest genera un conflicto de peer dependencies. Se fijó la versión `1.4.2`, que es la última compatible con NestJS 9.

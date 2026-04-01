@@ -18,6 +18,7 @@ npm test                                              # Run all unit tests
 npm run test:watch                                    # Watch mode
 npm run test:cov                                      # With coverage
 npm run test:e2e                                      # End-to-end tests
+npm run test:setup                                    # Build + run migrations + seed on test DB (run once before e2e on a fresh machine)
 npx jest --testPathPattern=auth.service --forceExit   # Run a single test file
 
 # Database
@@ -123,6 +124,8 @@ Event classes live in `src/events/`. Listeners live alongside their owning modul
 Currently implemented:
 - `user.registered` — emitted by `AuthService.register()`, consumed by `UserRegisteredListener`
 - `product.activated` — emitted by `ProductService.activateProduct()`, consumed by `ProductActivatedListener`
+
+`EventsController` (`src/api/events/events.controller.ts`) exposes `GET /events` as an SSE endpoint using `@Sse()`. It calls `eventEmitter.onAny()` to forward all domain events to connected clients as a stream of `{ event, payload }` objects.
 
 ## Frontend (client/)
 
