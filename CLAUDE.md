@@ -113,3 +113,26 @@ Use the `@Serialize(DtoClass)` decorator (from `src/common/helper/serialize.inte
 Unit test files (`*.spec.ts`) live next to the source files they test. The `test/` directory contains e2e tests and shared mock helpers. Unit tests mock the TypeORM repositories; e2e tests run against the real `ecommerceTestdb`.
 
 The `test/mocks/jwt.ts` helper generates a real JWT token via `JwtService` for use in e2e tests that hit protected routes.
+
+### Domain events
+
+The app uses `@nestjs/event-emitter` (v1.4.2 — locked for NestJS 9 compatibility). `EventEmitterModule.forRoot()` is registered in `ApiModule`, making `EventEmitter2` injectable anywhere.
+
+Event classes live in `src/events/`. Listeners live alongside their owning module under `src/api/<module>/listeners/` and must be listed in that module's `providers` array.
+
+Currently implemented:
+- `user.registered` — emitted by `AuthService.register()`, consumed by `UserRegisteredListener`
+- `product.activated` — emitted by `ProductService.activateProduct()`, consumed by `ProductActivatedListener`
+
+## Frontend (client/)
+
+A Vite + React + TypeScript app lives in `client/`. It is a separate project with its own `package.json` — commands must be run from inside `client/`.
+
+```bash
+cd client
+npm run dev      # Dev server (default port 5173)
+npm run build    # Production build
+npm run lint     # ESLint
+```
+
+The backend runs on port 3000 by default. All API calls from the frontend should target `http://localhost:3000`.
