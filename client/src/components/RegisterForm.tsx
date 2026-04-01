@@ -11,17 +11,17 @@ export function RegisterForm() {
     setMessage('')
     try {
       await register(email, password)
-      setMessage('User registered successfully')
+      setMessage('Usuario registrado exitosamente')
       setEmail('')
       setPassword('')
     } catch (err: any) {
-      setMessage(err.response?.data?.message || 'Error registering user')
+      setMessage(err.response?.data?.message || 'Error al registrar usuario')
     }
   }
 
   return (
     <div>
-      <h3>Register</h3>
+      <h3>Registrarse</h3>
       <form onSubmit={handleSubmit}>
         <div>
           <input
@@ -34,12 +34,12 @@ export function RegisterForm() {
         <div>
           <input
             type="password"
-            placeholder="Password"
+            placeholder="Contraseña"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
           />
         </div>
-        <button type="submit">Register</button>
+        <button type="submit">Registrarse</button>
       </form>
       {message && <p>{message}</p>}
     </div>

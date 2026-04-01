@@ -31,12 +31,12 @@ export function EventLog() {
   return (
     <div>
       <h3>
-        Domain Events{' '}
+        Eventos de dominio{' '}
         <small style={{ color: connected ? 'green' : 'red' }}>
-          {connected ? '● connected' : '○ disconnected'}
+          {connected ? '● conectado' : '○ desconectado'}
         </small>
       </h3>
-      {events.length === 0 && <p>Waiting for events...</p>}
+      {events.length === 0 && <p>Esperando eventos...</p>}
       {events.map((ev, i) => (
         <div key={i} style={{ marginBottom: '0.75rem', borderLeft: '3px solid #888', paddingLeft: '0.5rem' }}>
           <strong>[{ev.timestamp}] {ev.event}</strong>

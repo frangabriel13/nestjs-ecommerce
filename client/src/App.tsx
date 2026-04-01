@@ -24,7 +24,7 @@ function App() {
   return (
     <div style={{ display: 'flex', gap: '2rem', padding: '1rem', fontFamily: 'monospace' }}>
       <div style={{ flex: 1, minWidth: 0 }}>
-        <h2>ecommerce API</h2>
+        <h2>NestJs — Ecommerce</h2>
 
         {!token ? (
           <>
@@ -34,7 +34,7 @@ function App() {
           </>
         ) : (
           <>
-            <button onClick={handleLogout}>Logout</button>
+            <button onClick={handleLogout}>Cerrar sesión</button>
             <hr />
             <UserProfile />
             <hr />
